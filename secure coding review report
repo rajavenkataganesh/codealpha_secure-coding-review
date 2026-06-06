@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Secure Coding Review Report — CodeAlpha</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #07080f;
+    --card: #0d0f1a;
+    --border: #1a1d2e;
+    --text: #e2e4f0;
+    --muted: #6068a0;
+    --green: #00e676;
+    --red: #ff3d5a;
+    --yellow: #ffd600;
+    --blue: #4dabf7;
+    --orange: #ff8c42;
+    --purple: #c084fc;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); line-height:1.6; }
+
+  .header {
+    background: linear-gradient(135deg, #0d0f1a 0%, #0f1220 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 40px;
+  }
+  .header-top { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; margin-bottom:20px; }
+  .logo { font-family:'Syne',sans-serif; font-size:13px; font-weight:700; letter-spacing:0.1em; color:var(--muted); text-transform:uppercase; }
+  .report-title { font-family:'Syne',sans-serif; font-size:clamp(24px,5vw,42px); font-weight:800; margin-bottom:8px; }
+  .report-title span { color:var(--green); }
+  .report-meta { display:flex; gap:20px; flex-wrap:wrap; margin-top:16px; }
+  .meta-item { font-family:'DM Mono',monospace; font-size:12px; color:var(--muted); }
+  .meta-item strong { color:var(--text); }
+
+  .summary-bar {
+    display:grid; grid-template-columns:repeat(4,1fr); gap:1px;
+    background:var(--border); border-top:1px solid var(--border);
+  }
+  .summary-stat { background:var(--card); padding:20px 24px; text-align:center; }
+  .summary-num { font-family:'Syne',sans-serif; font-size:32px; font-weight:800; }
+  .summary-label { font-size:12px; color:var(--muted); margin-top:4px; font-family:'DM Mono',monospace; }
+  .num-red { color:var(--red); }
+  .num-yellow { color:var(--yellow); }
+  .num-green { color:var(--green); }
+  .num-blue { color:var(--blue); }
+
+  .container { max-width:900px; margin:0 auto; padding:40px 24px; }
+
+  .section-title {
+    font-family:'Syne',sans-serif; font-size:20px; font-weight:700;
+    margin:40px 0 16px; display:flex; align-items:center; gap:10px;
+  }
+  .section-title::after { content:''; flex:1; height:1px; background:var(--border); }
+
+  /* VULNERABILITY CARDS */
+  .vuln-card {
+    background:var(--card); border:1px solid var(--border);
+    border-radius:12px; overflow:hidden; margin-bottom:16px;
+  }
+  .vuln-header {
+    display:flex; align-items:center; gap:12px;
+    padding:16px 20px; border-bottom:1px solid var(--border);
+    cursor:pointer; user-select:none;
+  }
+  .vuln-header:hover { background:rgba(255,255,255,0.02); }
+  .vuln-num {
+    font-family:'DM Mono',monospace; font-size:11px;
+    background:rgba(255,255,255,0.05); border:1px solid var(--border);
+    padding:3px 8px; border-radius:4px; color:var(--muted);
+  }
+  .vuln-name { font-family:'Syne',sans-serif; font-size:15px; font-weight:700; flex:1; }
+  .severity {
+    font-family:'DM Mono',monospace; font-size:10px; font-weight:700;
+    padding:3px 10px; border-radius:20px; letter-spacing:0.05em;
+  }
+  .sev-critical { background:rgba(255,61,90,0.15); color:var(--red); border:1px solid rgba(255,61,90,0.3); }
+  .sev-high { background:rgba(255,140,66,0.15); color:var(--orange); border:1px solid rgba(255,140,66,0.3); }
+  .sev-medium { background:rgba(255,214,0,0.15); color:var(--yellow); border:1px solid rgba(255,214,0,0.3); }
+  .sev-low { background:rgba(0,230,118,0.15); color:var(--green); border:1px solid rgba(0,230,118,0.3); }
+  .chevron { color:var(--muted); transition:transform 0.3s; font-size:12px; }
+  .vuln-card.open .chevron { transform:rotate(180deg); }
+
+  .vuln-body { display:none; padding:20px; }
+  .vuln-card.open .vuln-body { display:block; }
+
+  .vuln-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:16px; }
+
+  .code-block {
+    background:#060810; border:1px solid var(--border);
+    border-radius:8px; padding:16px; font-family:'DM Mono',monospace;
+    font-size:12px; line-height:1.8; overflow-x:auto;
+  }
+  .code-label {
+    font-family:'DM Mono',monospace; font-size:10px; letter-spacing:0.1em;
+    text-transform:uppercase; margin-bottom:8px; font-weight:700;
+  }
+  .code-label.bad { color:var(--red); }
+  .code-label.good { color:var(--green); }
+  .code-bad { border-color:rgba(255,61,90,0.3); }
+  .code-good { border-color:rgba(0,230,118,0.3); }
+  .highlight-bad { color:var(--red); }
+  .highlight-good { color:var(--green); }
+  .highlight-yellow { color:var(--yellow); }
+  .highlight-blue { color:var(--blue); }
+  .highlight-purple { color:var(--purple); }
+  .comment { color:#4a5080; }
+
+  .impact-box {
+    background:rgba(255,61,90,0.05); border:1px solid rgba(255,61,90,0.2);
+    border-radius:8px; padding:14px; margin-bottom:14px;
+    font-size:13px; color:#d0d0e8;
+  }
+  .fix-box {
+    background:rgba(0,230,118,0.05); border:1px solid rgba(0,230,118,0.2);
+    border-radius:8px; padding:14px;
+    font-size:13px; color:#d0d0e8;
+  }
+  .box-title { font-family:'Syne',sans-serif; font-size:12px; font-weight:700; margin-bottom:6px; }
+  .box-title.red { color:var(--red); }
+  .box-title.green { color:var(--green); }
+
+  /* SUMMARY TABLE */
+  .table { width:100%; border-collapse:collapse; font-size:13px; }
+  .table th {
+    font-family:'DM Mono',monospace; font-size:11px; text-transform:uppercase;
+    letter-spacing:0.08em; color:var(--muted); padding:10px 14px;
+    border-bottom:2px solid var(--border); text-align:left;
+  }
+  .table td { padding:12px 14px; border-bottom:1px solid var(--border); vertical-align:middle; }
+  .table tr:last-child td { border-bottom:none; }
+  .table tr:hover td { background:rgba(255,255,255,0.02); }
+
+  .footer {
+    background:var(--card); border-top:1px solid var(--border);
+    padding:24px 40px; text-align:center;
+    font-family:'DM Mono',monospace; font-size:12px; color:var(--muted);
+    margin-top:60px;
+  }
+
+  @media(max-width:600px) {
+    .summary-bar { grid-template-columns:1fr 1fr; }
+    .vuln-grid { grid-template-columns:1fr; }
+    .header { padding:24px 20px; }
+    .report-meta { gap:12px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-top">
+    <div class="logo">CodeAlpha — Cyber Security Internship</div>
+    <div style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);">TASK 3 — SECURE CODING REVIEW</div>
+  </div>
+  <div class="report-title">Security Audit <span>Report</span></div>
+  <p style="color:var(--muted);font-size:14px;max-width:500px;">Static code analysis and security vulnerability assessment of a Python web application — with remediation recommendations.</p>
+  <div class="report-meta">
+    <div class="meta-item">Author: <strong>Tadiboina Raja Venkata Ganesh</strong></div>
+    <div class="meta-item">Language: <strong>Python 3</strong></div>
+    <div class="meta-item">Tool: <strong>Manual + Static Analysis</strong></div>
+    <div class="meta-item">Date: <strong>June 2026</strong></div>
+  </div>
+</div>
+
+<div class="summary-bar">
+  <div class="summary-stat"><div class="summary-num num-red">4</div><div class="summary-label">CRITICAL</div></div>
+  <div class="summary-stat"><div class="summary-num num-yellow">3</div><div class="summary-label">HIGH</div></div>
+  <div class="summary-stat"><div class="summary-num num-blue">2</div><div class="summary-label">MEDIUM</div></div>
+  <div class="summary-stat"><div class="summary-num num-green">1</div><div class="summary-label">LOW</div></div>
+</div>
+
+<div class="container">
+
+  <div class="section-title">🔍 Vulnerability Findings</div>
+
+  <!-- VULN 1 -->
+  <div class="vuln-card open" id="v1">
+    <div class="vuln-header" onclick="toggle('v1')">
+      <span class="vuln-num">V-001</span>
+      <span class="vuln-name">SQL Injection</span>
+      <span class="severity sev-critical">CRITICAL</span>
+      <span class="chevron">▼</span>
+    </div>
+    <div class="vuln-body">
+      <div class="impact-box">
+        <div class="box-title red">⚠ Impact</div>
+        Attacker can bypass authentication, dump entire database, or delete all data using crafted input like <code>' OR '1'='1</code>
+      </div>
+      <div class="vuln-grid">
+        <div>
+          <div class="code-label bad">❌ Vulnerable Code</div>
+          <div class="code-block code-bad">
+<span class="comment"># String concatenation in query</span>
+query = <span class="highlight-bad">"SELECT * FROM users WHERE username = '"</span>
+      <span class="highlight-bad">+ username +</span>
+      <span class="highlight-bad">"' AND password = '"</span>
+      <span class="highlight-bad">+ password + "'"</span>
+cursor.execute(query)
+          </div>
+        </div>
+        <div>
+          <div class="code-label good">✅ Fixed Code</div>
+          <div class="code-block code-good">
+<span class="comment"># Parameterized query — safe!</span>
+query = <span class="highlight-good">"SELECT * FROM users WHERE username = ?"</span>
+cursor.execute(query, <span class="highlight-good">(username,)</span>)
+<span class="comment"># Input never touches SQL directly</span>
+          </div>
+        </div>
+      </div>
+      <div class="fix-box">
+        <div class="box-title green">✅ Remediation</div>
+        Always use parameterized queries or ORM frameworks. Never concatenate user input directly into SQL strings.
+      </div>
+    </div>
+  </div>
+
+  <!-- VULN 2 -->
+  <div class="vuln-card" id="v2">
+    <div class="vuln-header" onclick="toggle('v2')">
+      <span class="vuln-num">V-002</span>
+      <span class="vuln-name">Hardcoded Credentials</span>
+      <span class="severity sev-critical">CRITICAL</span>
+      <span class="chevron">▼</span>
+    </div>
+    <div class="vuln-body">
+      <div class="impact-box">
+        <div class="box-title red">⚠ Impact</div>
+        If source code is exposed (GitHub leak, insider threat), attackers instantly gain full system access with hardcoded passwords.
+      </div>
+      <div class="vuln-grid">
+        <div>
+          <div class="code-label bad">❌ Vulnerable Code</div>
+          <div class="code-block code-bad">
+<span class="comment"># Hardcoded in source code!</span>
+SECRET_KEY = <span class="highlight-bad">"admin123"</span>
+DB_PASSWORD = <span class="highlight-bad">"password123"</span>
+          </div>
+        </div>
+        <div>
+          <div class="code-label good">✅ Fixed Code</div>
+          <div class="code-block code-good">
+<span class="comment"># Use environment variables</span>
+<span class="highlight-blue">import os, secrets</span>
+SECRET_KEY = <span class="highlight-green">os.environ.get(</span>
+  <span class="highlight-good">"SECRET_KEY"</span>,
+  <span class="highlight-green">secrets.token_hex(32))</span>
+          </div>
+        </div>
+      </div>
+      <div class="fix-box">
+        <div class="box-title green">✅ Remediation</div>
+        Store all secrets in environment variables or a secrets manager (AWS Secrets Manager, HashiCorp Vault). Never commit credentials to version control.
+      </div>
+    </div>
+  </div>
+
+  <!-- VULN 3 -->
+  <div class="vuln-card" id="v3">
+    <div class="vuln-header" onclick="toggle('v3')">
+      <span class="vuln-num">V-003</span>
+      <span class="vuln-name">Plain Text Password Storage</span>
+      <span class="severity sev-critical">CRITICAL</span>
+      <span class="chevron">▼</span>
+    </div>
+    <div class="vuln-body">
+      <div class="impact-box">
+        <div class="box-title red">⚠ Impact</div>
+        If the database is compromised, ALL user passwords are immediately exposed. No protection against credential stuffing attacks.
+      </div>
+      <div class="vuln-grid">
+        <div>
+          <div class="code-label bad">❌ Vulnerable Code</div>
+          <div class="code-block code-bad">
+<span class="comment"># Password stored as plain text!</span>
+cursor.execute(
+  "INSERT INTO users VALUES (?,?,?)",
+  (username, <span class="highlight-bad">password</span>, role)
+)
+<span class="comment"># Also: MD5 is broken!</span>
+hashlib.<span class="highlight-bad">md5</span>(password.encode())
+          </div>
+        </div>
+        <div>
+          <div class="code-label good">✅ Fixed Code</div>
+          <div class="code-block code-good">
+<span class="comment"># PBKDF2 with salt — secure!</span>
+salt = <span class="highlight-green">secrets.token_hex(32)</span>
+pwd_hash = hashlib.<span class="highlight-green">pbkdf2_hmac(</span>
+  <span class="highlight-good">'sha256'</span>,
+  password.encode(),
+  salt.encode(),
+  <span class="highlight-purple">iterations=100000</span>
+)
+          </div>
+        </div>
+      </div>
+      <div class="fix-box">
+        <div class="box-title green">✅ Remediation</div>
+        Use PBKDF2, bcrypt, or Argon2 for password hashing with a unique salt per user. Never store plain text or use MD5/SHA1 for passwords.
+      </div>
+    </div>
+  </div>
+
+  <!-- VULN 4 -->
+  <div class="vuln-card" id="v4">
+    <div class="vuln-header" onclick="toggle('v4')">
+      <span class="vuln-num">V-004</span>
+      <span class="vuln-name">Command Injection</span>
+      <span class="severity sev-critical">CRITICAL</span>
+      <span class="chevron">▼</span>
+    </div>
+    <div class="vuln-body">
+      <div class="impact-box">
+        <div class="box-title red">⚠ Impact</div>
+        Attacker can execute any OS command. Input like <code>; rm -rf /</code> or <code>; cat /etc/passwd</code> runs directly on the server.
+      </div>
+      <div class="vuln-grid">
+        <div>
+          <div class="code-label bad">❌ Vulnerable Code</div>
+          <div class="code-block code-bad">
+<span class="comment"># os.system with user input!</span>
+os.<span class="highlight-bad">system</span>(
+  <span class="highlight-bad">"echo " + user_input</span>
+)
+<span class="comment"># Input: "hello; rm -rf /"</span>
+          </div>
+        </div>
+        <div>
+          <div class="code-label good">✅ Fixed Code</div>
+          <div class="code-block code-good">
+<span class="comment"># subprocess with args list</span>
+<span class="highlight-blue">import subprocess</span>
+allowed = [<span class="highlight-good">"ls"</span>, <span class="highlight-good">"pwd"</span>]
+<span class="highlight-yellow">if command not in allowed:</span>
+  return <span class="highlight-good">"Not allowed"</span>
+subprocess.<span class="highlight-green">run</span>(
+  [command], <span class="comment"># list, not string!</span>
+  capture_output=True
+)
+          </div>
+        </div>
+      </div>
+      <div class="fix-box">
+        <div class="box-title green">✅ Remediation</div>
+        Never use os.system() with user input. Use subprocess with argument lists, implement command whitelisting, and apply principle of least privilege.
+      </div>
+    </div>
+  </div>
+
+  <!-- VULN 5 -->
+  <div class="vuln-card" id="v5">
+    <div class="vuln-header" onclick="toggle('v5')">
+      <span class="vuln-num">V-005</span>
+      <span class="vuln-name">Path Traversal</span>
+      <span class="severity sev-high">HIGH</span>
+      <span class="chevron">▼</span>
+    </div>
+    <div class="vuln-body">
+      <div class="impact-box">
+        <div class="box-title red">⚠ Impact</div>
+        Attacker can read/write any file on the server using paths like <code>../../etc/passwd</code> or <code>../../../config.py</code>
+      </div>
+      <div class="vuln-grid">
+        <div>
+          <div class="code-label bad">❌ Vulnerable Code</div>
+          <div class="code-block code-bad">
+<span class="comment"># No path validation!</span>
+def save_file(filename, content):
+  with open(<span class="highlight-bad">filename</span>, 'w') as f:
+    f.write(content)
+<span class="comment"># filename = "../../etc/cron.d/evil"</span>
+          </div>
+        </div>
+        <div>
+          <div class="code-label good">✅ Fixed Code</div>
+          <div class="code-block code-good">
+safe = os.path.<span class="highlight-green">realpath</span>(
+  os.path.join(allowed_dir, filename))
+<span class="highlight-yellow">if not safe.startswith(</span>
+    <span class="highlight-green">os.path.realpath(allowed_dir)</span>):
+  return <span class="highlight-good">"Path blocked!"</span>
+          </div>
+        </div>
+      </div>
+      <div class="fix-box">
+        <div class="box-title green">✅ Remediation</div>
+        Use os.path.realpath() to resolve the full path and verify it starts with the intended base directory. Sanitize filenames to remove special characters.
+      </div>
+    </div>
+  </div>
+
+  <!-- VULN 6 -->
+  <div class="vuln-card" id="v6">
+    <div class="vuln-header" onclick="toggle('v6')">
+      <span class="vuln-num">V-006</span>
+      <span class="vuln-name">Missing Authorization Check</span>
+      <span class="severity sev-high">HIGH</span>
+      <span class="chevron">▼</span>
+    </div>
+    <div class="vuln-body">
+      <div class="impact-box">
+        <div class="box-title red">⚠ Impact</div>
+        Any logged-in user can access other users' private data by simply changing the user_id parameter — classic IDOR vulnerability.
+      </div>
+      <div class="vuln-grid">
+        <div>
+          <div class="code-label bad">❌ Vulnerable Code</div>
+          <div class="code-block code-bad">
+<span class="comment"># No auth check at all!</span>
+def get_user_data(user_id):
+  query = "SELECT * FROM users WHERE id = "
+        + <span class="highlight-bad">str(user_id)</span>
+  cursor.execute(query)
+          </div>
+        </div>
+        <div>
+          <div class="code-label good">✅ Fixed Code</div>
+          <div class="code-block code-good">
+def get_user_data(user_id,
+    req_user_id, req_role):
+  <span class="highlight-yellow">if req_role != "admin" and</span>
+     <span class="highlight-yellow">req_user_id != user_id:</span>
+    return <span class="highlight-good">None, "Unauthorized"</span>
+  <span class="comment"># Only then query DB</span>
+          </div>
+        </div>
+      </div>
+      <div class="fix-box">
+        <div class="box-title green">✅ Remediation</div>
+        Always verify that the requesting user has permission to access the requested resource. Implement role-based access control (RBAC).
+      </div>
+    </div>
+  </div>
+
+  <!-- VULN 7 -->
+  <div class="vuln-card" id="v7">
+    <div class="vuln-header" onclick="toggle('v7')">
+      <span class="vuln-num">V-007</span>
+      <span class="vuln-name">No Input Validation</span>
+      <span class="severity sev-high">HIGH</span>
+      <span class="chevron">▼</span>
+    </div>
+    <div class="vuln-body">
+      <div class="impact-box">
+        <div class="box-title red">⚠ Impact</div>
+        Malicious scripts, excessively long inputs, or special characters can cause unexpected behavior, XSS attacks, or buffer issues.
+      </div>
+      <div class="vuln-grid">
+        <div>
+          <div class="code-label bad">❌ Vulnerable Code</div>
+          <div class="code-block code-bad">
+<span class="comment"># No validation before storing!</span>
+def register_user(username, password):
+  cursor.execute(
+    "INSERT INTO users VALUES (?,?)",
+    (<span class="highlight-bad">username, password</span>)
+  )
+          </div>
+        </div>
+        <div>
+          <div class="code-label good">✅ Fixed Code</div>
+          <div class="code-block code-good">
+<span class="highlight-blue">import re</span>
+<span class="highlight-yellow">if not re.match(</span>
+    <span class="highlight-good">r'^[a-zA-Z0-9_]{3,20}$'</span>,
+    username):
+  return <span class="highlight-good">"Invalid username"</span>
+<span class="highlight-yellow">if len(password) < 8:</span>
+  return <span class="highlight-good">"Password too short"</span>
+          </div>
+        </div>
+      </div>
+      <div class="fix-box">
+        <div class="box-title green">✅ Remediation</div>
+        Validate all inputs: length limits, allowed character sets, format checks. Reject anything that doesn't match expected patterns
